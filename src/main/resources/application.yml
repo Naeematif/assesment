@@ -1,0 +1,82 @@
+spring:
+  application:
+    name: api-monetization-gateway
+
+  datasource:
+    # H2 in-memory keeps the assignment runnable with `mvn spring-boot:run` and nothing else
+    # installed. Every schema construct used here (unique constraints, conditional UPDATE, GROUP BY)
+    # is plain SQL, so pointing this at PostgreSQL is a URL change.
+    url: jdbc:h2:mem:gateway;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+    hikari:
+      pool-name: gateway-pool
+      maximum-pool-size: 20
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+    show-sql: false
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+server:
+  port: 8080
+  error:
+    include-message: always
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+gateway:
+  # Header consumers authenticate with.
+  api-key-header: X-API-Key
+  # Only traffic below this prefix is authenticated, limited and billed.
+  metered-path-prefix: /api/
+
+  rate-limit:
+    enabled: true
+    # CUSTOMER: the per-second allowance belongs to the account, so extra API keys do not multiply it.
+    # API_KEY: each key gets its own bucket.
+    scope: CUSTOMER
+    bucket-idle-timeout: 15m
+    eviction-interval: 5m
+
+  usage:
+    # Usage writes happen off the request thread in production.
+    async: true
+    worker-threads: 2
+    queue-capacity: 10000
+
+  billing:
+    # 02:15 on the first of each month, closing the month that just ended.
+    aggregation-cron: "0 15 2 1 * *"
+    # Billing months are defined in this zone, not the host's.
+    timezone: UTC
+
+  cache:
+    credential-ttl: 30s
+
+  seed:
+    enabled: true
+    free-api-key: amk_live_demo_free_key
+    pro-api-key: amk_live_demo_pro_key
+
+logging:
+  level:
+    org.example.gateway: INFO
